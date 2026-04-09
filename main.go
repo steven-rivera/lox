@@ -18,8 +18,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// TODO: Uncomment the code below to pass the first stage
-
 	lox := Lox{}
 
 	if len(os.Args) == 3 {

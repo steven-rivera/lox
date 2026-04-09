@@ -13,7 +13,10 @@ type Lox struct {
 func (l *Lox) run(source string) {
 	scanner := NewScanner(source)
 
-	tokens, _ := scanner.scanTokens()
+	tokens, errs := scanner.scanTokens()
+	if errs != nil {
+		l.hadError = true
+	}
 
 	for _, token := range tokens {
 		fmt.Println(token.toString())
@@ -27,14 +30,10 @@ func (l *Lox) runFile(filename string) {
 		os.Exit(1)
 	}
 
-	if len(fileContents) > 0 {
-		l.run(string(fileContents))
+	l.run(string(fileContents))
 
-		if l.hadError {
-			os.Exit(65)
-		}
-	} else {
-		fmt.Println("EOF  null") // Placeholder, replace this line when implementing the scanner
+	if l.hadError {
+		os.Exit(65)
 	}
 }
 
@@ -62,5 +61,5 @@ func Error(line int, message string) error {
 }
 
 func Report(line int, where, message string) {
-	fmt.Printf("[line %d] Error%s: %s\n", line, where, message)
+	fmt.Fprintf(os.Stderr, "[line %d] Error%s: %s\n", line, where, message)
 }

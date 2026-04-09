@@ -1,6 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
 
 type TokenType = string
 
@@ -61,13 +65,20 @@ type Token struct {
 }
 
 func (t *Token) toString() string {
-	if t.Literal == nil {
+	switch t.Literal.(type) {
+	case nil:
 		return fmt.Sprintf("%s %s null", t.Type, t.Lexeme)
+	case float64:
+		return fmt.Sprintf("%s %s %s", t.Type, t.Lexeme, floatString(t.Literal.(float64)))
+	default:
+		return fmt.Sprintf("%s %s %v", t.Type, t.Lexeme, t.Literal)
 	}
-	return fmt.Sprintf("%s %s %v", t.Type, t.Lexeme, t.Literal)
-
 }
 
-type Object struct {
-	pass int
+func floatString(f float64) string {
+	s := strconv.FormatFloat(f, 'f', -1, 64)
+	if !strings.Contains(s, ".") {
+		s += ".0"
+	}
+	return s
 }

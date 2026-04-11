@@ -13,12 +13,14 @@ func main() {
 
 	command := os.Args[1]
 
-	if command != "tokenize" {
+	if (command != "tokenize") && (command != "parse") {
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", command)
 		os.Exit(1)
 	}
 
-	lox := Lox{}
+	lox := Lox{
+		justTokenize: command == "tokenize",
+	}
 
 	if len(os.Args) == 3 {
 		lox.runFile(os.Args[2])

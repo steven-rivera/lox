@@ -7,7 +7,8 @@ import (
 )
 
 type Lox struct {
-	hadError bool
+	hadError     bool
+	justTokenize bool
 }
 
 func (l *Lox) run(source string) {
@@ -18,9 +19,22 @@ func (l *Lox) run(source string) {
 		l.hadError = true
 	}
 
-	for _, token := range tokens {
-		fmt.Println(token.toString())
+	if l.justTokenize {
+		for _, token := range tokens {
+			fmt.Println(token.toString())
+		}
+		return 
 	}
+	
+	parser := NewParser(tokens)
+	expr, err := parser.parse()
+	if err != nil {
+		l.hadError = true
+		return
+	}
+
+	printer := AstPrinter{}
+	fmt.Println(printer.print(expr))
 
 }
 func (l *Lox) runFile(filename string) {
@@ -55,11 +69,19 @@ func (l *Lox) runPrompt() {
 	}
 }
 
-func Error(line int, message string) error {
+func ScanError(line int, message string) error {
 	Report(line, "", message)
 	return fmt.Errorf("%s", message)
 }
 
 func Report(line int, where, message string) {
 	fmt.Fprintf(os.Stderr, "[line %d] Error%s: %s\n", line, where, message)
+}
+
+func ParseError(token Token, message string) {
+	if token.Type == EOF {
+		Report(token.Line, " at end", message)
+	} else {
+		Report(token.Line, " at '"+token.Lexeme+"'", message)
+	}
 }

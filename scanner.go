@@ -129,9 +129,8 @@ func (s *Scanner) scanToken() error {
 		} else if isAlpha(c) {
 			s.identifier()
 		} else {
-			return Error(s.line, fmt.Sprintf("Unexpected character: %c", c))
+			return ScanError(s.line, fmt.Sprintf("Unexpected character: %c", c))
 		}
-
 	}
 
 	return nil
@@ -194,8 +193,8 @@ func (s *Scanner) string() error {
 	}
 
 	if s.isAtEnd() {
-		return Error(s.line, "Unterminated string.")
-		
+		return ScanError(s.line, "Unterminated string.")
+
 	}
 
 	// The closing ".

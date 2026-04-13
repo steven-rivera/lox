@@ -7,11 +7,13 @@ import (
 )
 
 type Lox struct {
-	hadError     bool
-	justTokenize bool
+	hadError        bool
+	hadRuntimeError bool
+	command         string
+	interpreter     Interpreter
 }
 
-func (l *Lox) run(source string) {
+func (l *Lox) tokenize(source string) {
 	scanner := NewScanner(source)
 
 	tokens, errs := scanner.scanTokens()
@@ -19,13 +21,19 @@ func (l *Lox) run(source string) {
 		l.hadError = true
 	}
 
-	if l.justTokenize {
-		for _, token := range tokens {
-			fmt.Println(token.toString())
-		}
-		return 
+	for _, token := range tokens {
+		fmt.Println(token.toString())
 	}
-	
+
+}
+func (l *Lox) parse(source string) {
+	scanner := NewScanner(source)
+
+	tokens, errs := scanner.scanTokens()
+	if errs != nil {
+		l.hadError = true
+	}
+
 	parser := NewParser(tokens)
 	expr, err := parser.parse()
 	if err != nil {
@@ -34,9 +42,41 @@ func (l *Lox) run(source string) {
 	}
 
 	printer := AstPrinter{}
-	fmt.Println(printer.print(expr))
-
+	fmt.Print(printer.print(expr))
 }
+
+func (l *Lox) evaluate(source string) {
+	scanner := NewScanner(source)
+
+	tokens, errs := scanner.scanTokens()
+	if errs != nil {
+		l.hadError = true
+	}
+
+	parser := NewParser(tokens)
+	expr, err := parser.parse()
+	if err != nil {
+		l.hadError = true
+		return
+	}
+
+	if err := l.interpreter.interpret(expr); err != nil {
+		runtimeError(err.(RuntimeError))
+		l.hadRuntimeError = true
+	}
+}
+
+func (l *Lox) run(source string) {
+	switch l.command {
+	case "tokenize":
+		l.tokenize(source)
+	case "parse":
+		l.parse(source)
+	case "evaluate":
+		l.evaluate(source)
+	}
+}
+
 func (l *Lox) runFile(filename string) {
 	fileContents, err := os.ReadFile(filename)
 	if err != nil {
@@ -48,6 +88,10 @@ func (l *Lox) runFile(filename string) {
 
 	if l.hadError {
 		os.Exit(65)
+	}
+
+	if l.hadRuntimeError {
+		os.Exit(70)
 	}
 }
 
@@ -84,4 +128,9 @@ func ParseError(token Token, message string) {
 	} else {
 		Report(token.Line, " at '"+token.Lexeme+"'", message)
 	}
+}
+
+func runtimeError(err RuntimeError) {
+	fmt.Fprintf(os.Stderr, "%s\n[line %d]", err.message, err.token.Line)
+	// hadRuntimeError = true
 }

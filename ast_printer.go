@@ -7,15 +7,15 @@ import (
 
 type AstPrinter struct{}
 
-func (p *AstPrinter) VisitBinaryExpr(expr *Binary) any {
+func (p *AstPrinter) VisitBinaryExpr(expr *BinaryExpr) any {
 	return p.parenthesize(expr.Operator.Lexeme, expr.Left, expr.Right)
 }
 
-func (p *AstPrinter) VisitGroupingExpr(expr *Grouping) any {
+func (p *AstPrinter) VisitGroupingExpr(expr *GroupingExpr) any {
 	return p.parenthesize("group", expr.Expression)
 }
 
-func (p *AstPrinter) VisitLiteralExpr(expr *Literal) any {
+func (p *AstPrinter) VisitLiteralExpr(expr *LiteralExpr) any {
 	if expr.Value == nil {
 		return "nil"
 	}
@@ -25,8 +25,16 @@ func (p *AstPrinter) VisitLiteralExpr(expr *Literal) any {
 	return fmt.Sprintf("%v", expr.Value)
 }
 
-func (p *AstPrinter) VisitUnaryExpr(expr *Unary) any {
+func (p *AstPrinter) VisitUnaryExpr(expr *UnaryExpr) any {
 	return p.parenthesize(expr.Operator.Lexeme, expr.Right)
+}
+
+func (p *AstPrinter) VisitVariableExpr(expr *VariableExpr) any {
+	return p.parenthesize(expr.Name.Lexeme)
+}
+
+func (p *AstPrinter) VisitAssignExpr(expr *AssignExpr) any {
+	return p.parenthesize("var " + expr.Name.Lexeme + " = " + p.print(expr.Value))
 }
 
 func (p *AstPrinter) print(expr Expr) string {

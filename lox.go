@@ -10,7 +10,7 @@ type Lox struct {
 	hadError        bool
 	hadRuntimeError bool
 	command         string
-	interpreter     Interpreter
+	interpreter     *Interpreter
 }
 
 func (l *Lox) tokenize(source string) {
@@ -26,7 +26,7 @@ func (l *Lox) tokenize(source string) {
 	}
 
 }
-func (l *Lox) parse(source string) {
+func (l *Lox) parseExpr(source string) {
 	scanner := NewScanner(source)
 
 	tokens, errs := scanner.scanTokens()
@@ -35,7 +35,7 @@ func (l *Lox) parse(source string) {
 	}
 
 	parser := NewParser(tokens)
-	expr, err := parser.parse()
+	expr, err := parser.parseExpr()
 	if err != nil {
 		l.hadError = true
 		return
@@ -45,7 +45,7 @@ func (l *Lox) parse(source string) {
 	fmt.Print(printer.print(expr))
 }
 
-func (l *Lox) evaluate(source string) {
+func (l *Lox) evaluateExpr(source string) {
 	scanner := NewScanner(source)
 
 	tokens, errs := scanner.scanTokens()
@@ -54,13 +54,34 @@ func (l *Lox) evaluate(source string) {
 	}
 
 	parser := NewParser(tokens)
-	expr, err := parser.parse()
+	expr, err := parser.parseExpr()
 	if err != nil {
 		l.hadError = true
 		return
 	}
 
-	if err := l.interpreter.interpret(expr); err != nil {
+	if err := l.interpreter.interpretExpr(expr); err != nil {
+		runtimeError(err.(RuntimeError))
+		l.hadRuntimeError = true
+	}
+}
+
+func (l *Lox) interpretStmts(source string) {
+	scanner := NewScanner(source)
+
+	tokens, errs := scanner.scanTokens()
+	if errs != nil {
+		l.hadError = true
+	}
+
+	parser := NewParser(tokens)
+	statements, err := parser.parse()
+	if err != nil {
+		l.hadError = true
+		return
+	}
+
+	if err := l.interpreter.interpret(statements); err != nil {
 		runtimeError(err.(RuntimeError))
 		l.hadRuntimeError = true
 	}
@@ -71,9 +92,11 @@ func (l *Lox) run(source string) {
 	case "tokenize":
 		l.tokenize(source)
 	case "parse":
-		l.parse(source)
+		l.parseExpr(source)
 	case "evaluate":
-		l.evaluate(source)
+		l.evaluateExpr(source)
+	case "run":
+		l.interpretStmts(source)
 	}
 }
 

@@ -5,9 +5,17 @@ import (
 	"reflect"
 )
 
-type Interpreter struct{}
+type Interpreter struct {
+	Environment *Environment
+}
 
-func (i *Interpreter) VisitBinaryExpr(expr *Binary) any {
+func NewInterpreter() *Interpreter {
+	return &Interpreter{
+		Environment: NewEnvironment(nil),
+	}
+}
+
+func (i *Interpreter) VisitBinaryExpr(expr *BinaryExpr) any {
 	left := i.evaluate(expr.Left)
 	if err, ok := left.(RuntimeError); ok {
 		return err
@@ -78,15 +86,15 @@ func (i *Interpreter) VisitBinaryExpr(expr *Binary) any {
 	return nil
 }
 
-func (i *Interpreter) VisitGroupingExpr(expr *Grouping) any {
+func (i *Interpreter) VisitGroupingExpr(expr *GroupingExpr) any {
 	return i.evaluate(expr.Expression)
 }
 
-func (i *Interpreter) VisitLiteralExpr(expr *Literal) any {
+func (i *Interpreter) VisitLiteralExpr(expr *LiteralExpr) any {
 	return expr.Value
 }
 
-func (i *Interpreter) VisitUnaryExpr(expr *Unary) any {
+func (i *Interpreter) VisitUnaryExpr(expr *UnaryExpr) any {
 	right := i.evaluate(expr.Right)
 	if err, ok := right.(RuntimeError); ok {
 		return err
@@ -105,8 +113,70 @@ func (i *Interpreter) VisitUnaryExpr(expr *Unary) any {
 	return nil
 }
 
+func (i *Interpreter) VisitVariableExpr(expr *VariableExpr) any {
+	return i.Environment.get(expr.Name)
+}
+
+func (i *Interpreter) VisitAssignExpr(expr *AssignExpr) any {
+	value := i.evaluate(expr.Value)
+	if err := i.Environment.assign(expr.Name, value); err != nil {
+		return err
+	}
+	return value
+}
+
+func (i *Interpreter) VisitExpressionStmt(stmt *ExprStmt) any {
+	return i.evaluate(stmt.Expression)
+}
+
+func (i *Interpreter) VisitPrintStmt(stmt *PrintStmt) any {
+	value := i.evaluate(stmt.Expression)
+	if err, ok := value.(RuntimeError); ok {
+		return err
+	}
+	fmt.Println(i.stringify(value))
+	return nil
+}
+
+func (i *Interpreter) VisitVarStmt(stmt *VarStmt) any {
+	var value any = nil
+	if stmt.Initializer != nil {
+		value = i.evaluate(stmt.Initializer)
+		if err, ok := value.(RuntimeError); ok {
+			return err
+		}
+	}
+	i.Environment.define(stmt.Name.Lexeme, value)
+	return nil
+}
+
+func (i *Interpreter) VisitBlockStmt(stmt *BlockStmt) any {
+	return i.executeBlock(stmt.Statements, NewEnvironment(i.Environment))
+}
+
 func (i *Interpreter) evaluate(expr Expr) any {
 	return expr.Accept(i)
+}
+
+func (i *Interpreter) execute(stmt Stmt) any {
+	return stmt.Accept(i)
+}
+
+func (i *Interpreter) executeBlock(statements []Stmt, environment *Environment) any {
+	previous := i.Environment
+	i.Environment = environment
+
+	defer func() {
+		i.Environment = previous
+	}()
+
+	for _, stmt := range statements {
+		if err, ok := i.execute(stmt).(RuntimeError); ok {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (i *Interpreter) isTruthy(value any) bool {
@@ -140,7 +210,17 @@ func (i *Interpreter) checkNumberOperands(operator Token, left, right any) error
 	return NewRunTimeError(operator, "Operands must be numbers.")
 }
 
-func (i *Interpreter) interpret(expr Expr) error {
+func (i *Interpreter) interpret(statements []Stmt) error {
+	for _, statement := range statements {
+		err := i.execute(statement)
+		if err, ok := err.(RuntimeError); ok {
+			return err
+		}
+	}
+	return nil
+}
+
+func (i *Interpreter) interpretExpr(expr Expr) error {
 	value := i.evaluate(expr)
 	if err, ok := value.(RuntimeError); ok {
 		return err

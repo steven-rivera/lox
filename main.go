@@ -9,6 +9,7 @@ var commands map[string]bool = map[string]bool{
 	"tokenize": true,
 	"parse":    true,
 	"evaluate": true,
+	"run": true,
 }
 
 func main() {
@@ -26,6 +27,7 @@ func main() {
 
 	lox := Lox{
 		command: command,
+		interpreter: NewInterpreter(),
 	}
 
 	if len(os.Args) == 3 {

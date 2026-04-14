@@ -1,47 +1,66 @@
 package main
 
-type Visitor interface {
-	VisitBinaryExpr(*Binary) any
-	VisitLiteralExpr(*Literal) any
-	VisitGroupingExpr(*Grouping) any
-	VisitUnaryExpr(*Unary) any
+type ExprVisitor interface {
+	VisitBinaryExpr(*BinaryExpr) any
+	VisitLiteralExpr(*LiteralExpr) any
+	VisitGroupingExpr(*GroupingExpr) any
+	VisitUnaryExpr(*UnaryExpr) any
+	VisitVariableExpr(*VariableExpr) any
+	VisitAssignExpr(*AssignExpr) any
 }
 
 type Expr interface {
-	Accept(v Visitor) any
+	Accept(v ExprVisitor) any
 }
 
-type Binary struct {
+type BinaryExpr struct {
 	Left     Expr
 	Operator Token
 	Right    Expr
 }
 
-func (b *Binary) Accept(v Visitor) any {
+func (b *BinaryExpr) Accept(v ExprVisitor) any {
 	return v.VisitBinaryExpr(b)
 }
 
-type Grouping struct {
+type GroupingExpr struct {
 	Expression Expr
 }
 
-func (g *Grouping) Accept(v Visitor) any {
+func (g *GroupingExpr) Accept(v ExprVisitor) any {
 	return v.VisitGroupingExpr(g)
 }
 
-type Literal struct {
+type LiteralExpr struct {
 	Value any
 }
 
-func (l *Literal) Accept(v Visitor) any {
+func (l *LiteralExpr) Accept(v ExprVisitor) any {
 	return v.VisitLiteralExpr(l)
 }
 
-type Unary struct {
+type UnaryExpr struct {
 	Operator Token
 	Right    Expr
 }
 
-func (u *Unary) Accept(v Visitor) any {
+func (u *UnaryExpr) Accept(v ExprVisitor) any {
 	return v.VisitUnaryExpr(u)
+}
+
+type VariableExpr struct {
+	Name Token
+}
+
+func (ve *VariableExpr) Accept(v ExprVisitor) any {
+	return v.VisitVariableExpr(ve)
+}
+
+type AssignExpr struct {
+	Name Token
+	Value Expr
+}
+
+func (ae *AssignExpr) Accept(v ExprVisitor) any {
+	return v.VisitAssignExpr(ae)
 }

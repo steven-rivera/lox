@@ -86,6 +86,29 @@ func (i *Interpreter) VisitBinaryExpr(expr *BinaryExpr) any {
 	return nil
 }
 
+func (i *Interpreter) VisitLogicalExpr(expr *LogicalExpr) any {
+	left := i.evaluate(expr.Left)
+	if err, ok := left.(RuntimeError); ok {
+		return err
+	}
+
+	if expr.Operator.Type == OR {
+		if i.isTruthy(left) {
+			return left
+		}
+	} else {
+		if !i.isTruthy(left) {
+			return left
+		}
+	}
+
+	right := i.evaluate(expr.Right)
+	if err, ok := left.(RuntimeError); ok {
+		return err
+	}
+	return right
+}
+
 func (i *Interpreter) VisitGroupingExpr(expr *GroupingExpr) any {
 	return i.evaluate(expr.Expression)
 }
@@ -129,6 +152,20 @@ func (i *Interpreter) VisitExpressionStmt(stmt *ExprStmt) any {
 	return i.evaluate(stmt.Expression)
 }
 
+func (i *Interpreter) VisitIfStmt(stmt *IfStmt) any {
+	value := i.evaluate(stmt.Condition)
+	if err, ok := value.(RuntimeError); ok {
+		return err
+	}
+
+	if i.isTruthy(value) {
+		return i.execute(stmt.ThenBranch)
+	} else if stmt.ElseBranch != nil {
+		return i.execute(stmt.ElseBranch)
+	}
+	return nil
+}
+
 func (i *Interpreter) VisitPrintStmt(stmt *PrintStmt) any {
 	value := i.evaluate(stmt.Expression)
 	if err, ok := value.(RuntimeError); ok {
@@ -147,6 +184,24 @@ func (i *Interpreter) VisitVarStmt(stmt *VarStmt) any {
 		}
 	}
 	i.Environment.define(stmt.Name.Lexeme, value)
+	return nil
+}
+
+func (i *Interpreter) VisitWhileStmt(stmt *WhileStmt) any {
+	for {
+		value := i.evaluate(stmt.Condition)
+		if err, ok := value.(RuntimeError); ok {
+			return err
+		}
+
+		if !i.isTruthy(value) {
+			break
+		}
+
+		if err := i.execute(stmt.Body); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

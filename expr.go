@@ -2,6 +2,7 @@ package main
 
 type ExprVisitor interface {
 	VisitBinaryExpr(*BinaryExpr) any
+	VisitLogicalExpr(*LogicalExpr) any
 	VisitLiteralExpr(*LiteralExpr) any
 	VisitGroupingExpr(*GroupingExpr) any
 	VisitUnaryExpr(*UnaryExpr) any
@@ -21,6 +22,16 @@ type BinaryExpr struct {
 
 func (b *BinaryExpr) Accept(v ExprVisitor) any {
 	return v.VisitBinaryExpr(b)
+}
+
+type LogicalExpr struct {
+	Left     Expr
+	Operator Token
+	Right    Expr
+}
+
+func (l *LogicalExpr) Accept(v ExprVisitor) any {
+	return v.VisitLogicalExpr(l)
 }
 
 type GroupingExpr struct {
@@ -57,7 +68,7 @@ func (ve *VariableExpr) Accept(v ExprVisitor) any {
 }
 
 type AssignExpr struct {
-	Name Token
+	Name  Token
 	Value Expr
 }
 

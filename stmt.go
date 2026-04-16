@@ -4,7 +4,9 @@ type StmtVisitor interface {
 	VisitExpressionStmt(*ExprStmt) any
 	VisitPrintStmt(*PrintStmt) any
 	VisitVarStmt(*VarStmt) any
-	VisitBlockStmt(*BlockStmt) any 
+	VisitBlockStmt(*BlockStmt) any
+	VisitIfStmt(*IfStmt) any
+	VisitWhileStmt(*WhileStmt) any
 }
 
 type Stmt interface {
@@ -28,7 +30,7 @@ func (p *PrintStmt) Accept(v StmtVisitor) any {
 }
 
 type VarStmt struct {
-	Name Token
+	Name        Token
 	Initializer Expr
 }
 
@@ -42,4 +44,23 @@ type BlockStmt struct {
 
 func (bs *BlockStmt) Accept(v StmtVisitor) any {
 	return v.VisitBlockStmt(bs)
+}
+
+type IfStmt struct {
+	Condition  Expr
+	ThenBranch Stmt
+	ElseBranch Stmt
+}
+
+func (is *IfStmt) Accept(v StmtVisitor) any {
+	return v.VisitIfStmt(is)
+}
+
+type WhileStmt struct {
+	Condition Expr
+	Body      Stmt
+}
+
+func (w *WhileStmt) Accept(v StmtVisitor) any {
+	return v.VisitWhileStmt(w)
 }

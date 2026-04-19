@@ -3,25 +3,31 @@ package main
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 )
 
 type Interpreter struct {
+	Globals     *Environment
 	Environment *Environment
 }
 
 func NewInterpreter() *Interpreter {
+	globals := NewEnvironment(nil)
+	globals.define("clock", &LoxClock{})
+
 	return &Interpreter{
-		Environment: NewEnvironment(nil),
+		Globals:     globals,
+		Environment: globals,
 	}
 }
 
 func (i *Interpreter) VisitBinaryExpr(expr *BinaryExpr) any {
 	left := i.evaluate(expr.Left)
-	if err, ok := left.(RuntimeError); ok {
+	if err, ok := left.(error); ok {
 		return err
 	}
 	right := i.evaluate(expr.Right)
-	if err, ok := right.(RuntimeError); ok {
+	if err, ok := right.(error); ok {
 		return err
 	}
 
@@ -88,7 +94,7 @@ func (i *Interpreter) VisitBinaryExpr(expr *BinaryExpr) any {
 
 func (i *Interpreter) VisitLogicalExpr(expr *LogicalExpr) any {
 	left := i.evaluate(expr.Left)
-	if err, ok := left.(RuntimeError); ok {
+	if err, ok := left.(error); ok {
 		return err
 	}
 
@@ -103,7 +109,7 @@ func (i *Interpreter) VisitLogicalExpr(expr *LogicalExpr) any {
 	}
 
 	right := i.evaluate(expr.Right)
-	if err, ok := left.(RuntimeError); ok {
+	if err, ok := left.(error); ok {
 		return err
 	}
 	return right
@@ -119,7 +125,7 @@ func (i *Interpreter) VisitLiteralExpr(expr *LiteralExpr) any {
 
 func (i *Interpreter) VisitUnaryExpr(expr *UnaryExpr) any {
 	right := i.evaluate(expr.Right)
-	if err, ok := right.(RuntimeError); ok {
+	if err, ok := right.(error); ok {
 		return err
 	}
 	switch expr.Operator.Type {
@@ -148,13 +154,38 @@ func (i *Interpreter) VisitAssignExpr(expr *AssignExpr) any {
 	return value
 }
 
+func (i *Interpreter) VisitCallExpr(expr *CallExpr) any {
+	callee := i.evaluate(expr.Callee)
+
+	var arguments []any
+	for _, argument := range expr.Arguments {
+		value := i.evaluate(argument)
+		if err, ok := value.(error); ok {
+			return err
+		}
+		arguments = append(arguments, value)
+	}
+
+	function, ok := callee.(LoxCallable)
+	if !ok {
+		return NewRunTimeError(expr.Paren, "Can only call functions and classes.")
+	}
+	if len(arguments) != function.Arity() {
+		return NewRunTimeError(expr.Paren,
+			fmt.Sprintf("Expected %d arguments but got %d.", function.Arity(), len(arguments)),
+		)
+	}
+
+	return function.Call(i, arguments)
+}
+
 func (i *Interpreter) VisitExpressionStmt(stmt *ExprStmt) any {
 	return i.evaluate(stmt.Expression)
 }
 
 func (i *Interpreter) VisitIfStmt(stmt *IfStmt) any {
 	value := i.evaluate(stmt.Condition)
-	if err, ok := value.(RuntimeError); ok {
+	if err, ok := value.(error); ok {
 		return err
 	}
 
@@ -168,18 +199,30 @@ func (i *Interpreter) VisitIfStmt(stmt *IfStmt) any {
 
 func (i *Interpreter) VisitPrintStmt(stmt *PrintStmt) any {
 	value := i.evaluate(stmt.Expression)
-	if err, ok := value.(RuntimeError); ok {
+	if err, ok := value.(error); ok {
 		return err
 	}
 	fmt.Println(i.stringify(value))
 	return nil
 }
 
+func (i *Interpreter) VisitReturnStmt(stmt *ReturnStmt) any {
+	var value any = nil
+	if stmt.Value != nil {
+		value = i.evaluate(stmt.Value)
+		if err, ok := value.(error); ok {
+			return err
+		}
+	}
+
+	return NewReturnError(value)
+}
+
 func (i *Interpreter) VisitVarStmt(stmt *VarStmt) any {
 	var value any = nil
 	if stmt.Initializer != nil {
 		value = i.evaluate(stmt.Initializer)
-		if err, ok := value.(RuntimeError); ok {
+		if err, ok := value.(error); ok {
 			return err
 		}
 	}
@@ -190,7 +233,7 @@ func (i *Interpreter) VisitVarStmt(stmt *VarStmt) any {
 func (i *Interpreter) VisitWhileStmt(stmt *WhileStmt) any {
 	for {
 		value := i.evaluate(stmt.Condition)
-		if err, ok := value.(RuntimeError); ok {
+		if err, ok := value.(error); ok {
 			return err
 		}
 
@@ -202,6 +245,12 @@ func (i *Interpreter) VisitWhileStmt(stmt *WhileStmt) any {
 			return err
 		}
 	}
+	return nil
+}
+
+func (i *Interpreter) VisitFunctionStmt(stmt *FunctionStmt) any {
+	function := NewLoxFuncntion(stmt, i.Environment)
+	i.Environment.define(stmt.Name.Lexeme, function)
 	return nil
 }
 
@@ -226,7 +275,7 @@ func (i *Interpreter) executeBlock(statements []Stmt, environment *Environment) 
 	}()
 
 	for _, stmt := range statements {
-		if err, ok := i.execute(stmt).(RuntimeError); ok {
+		if err, ok := i.execute(stmt).(error); ok {
 			return err
 		}
 	}
@@ -268,7 +317,7 @@ func (i *Interpreter) checkNumberOperands(operator Token, left, right any) error
 func (i *Interpreter) interpret(statements []Stmt) error {
 	for _, statement := range statements {
 		err := i.execute(statement)
-		if err, ok := err.(RuntimeError); ok {
+		if err, ok := err.(error); ok {
 			return err
 		}
 	}
@@ -277,7 +326,7 @@ func (i *Interpreter) interpret(statements []Stmt) error {
 
 func (i *Interpreter) interpretExpr(expr Expr) error {
 	value := i.evaluate(expr)
-	if err, ok := value.(RuntimeError); ok {
+	if err, ok := value.(error); ok {
 		return err
 	}
 	fmt.Print(i.stringify(value))
@@ -285,8 +334,14 @@ func (i *Interpreter) interpretExpr(expr Expr) error {
 }
 
 func (i *Interpreter) stringify(object any) string {
-	if object == nil {
+	switch object := object.(type) {
+	case nil:
 		return "nil"
+	case float64:
+		return strconv.FormatFloat(object, 'f', -1, 64)
+	case LoxCallable:
+		return object.toString()
+	default:
+		return fmt.Sprint(object)
 	}
-	return fmt.Sprint(object)
 }

@@ -8,6 +8,7 @@ type ExprVisitor interface {
 	VisitUnaryExpr(*UnaryExpr) any
 	VisitVariableExpr(*VariableExpr) any
 	VisitAssignExpr(*AssignExpr) any
+	VisitCallExpr(*CallExpr) any
 }
 
 type Expr interface {
@@ -75,3 +76,15 @@ type AssignExpr struct {
 func (ae *AssignExpr) Accept(v ExprVisitor) any {
 	return v.VisitAssignExpr(ae)
 }
+
+type CallExpr struct {
+	Callee    Expr
+	Paren     Token
+	Arguments []Expr
+}
+
+func (c *CallExpr) Accept(v ExprVisitor) any {
+	return v.VisitCallExpr(c)
+}
+
+

@@ -41,6 +41,10 @@ func (p *AstPrinter) VisitAssignExpr(expr *AssignExpr) any {
 	return p.parenthesize("var " + expr.Name.Lexeme + " = " + p.print(expr.Value))
 }
 
+func (p *AstPrinter) VisitCallExpr(expr *CallExpr) any {
+	return p.parenthesize("func " + p.print(expr.Callee), expr.Arguments...)
+}
+
 func (p *AstPrinter) print(expr Expr) string {
 	return expr.Accept(p).(string)
 }

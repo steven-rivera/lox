@@ -77,7 +77,9 @@ func (p *Parser) declaration() (Stmt, error) {
 	var stmt Stmt
 	var err error
 
-	if p.match(VAR) {
+	if p.match(FUN) {
+		stmt, err = p.function("function")
+	} else if p.match(VAR) {
 		stmt, err = p.varDeclaration()
 	} else {
 		stmt, err = p.statement()
@@ -89,6 +91,55 @@ func (p *Parser) declaration() (Stmt, error) {
 	}
 
 	return stmt, nil
+}
+
+func (p *Parser) function(kind string) (Stmt, error) {
+	name, err := p.consume(IDENTIFIER, "Expect "+kind+" name.")
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := p.consume(LEFT_PAREN, "Expect '(' after "+kind+" name."); err != nil {
+		return nil, err
+	}
+
+	var parameters []Token
+	if !p.check(RIGHT_PAREN) {
+		for {
+			if len(parameters) >= 255 {
+				p.Error(p.peek(), "Can't have more than 255 parameters.")
+			}
+
+			param, err := p.consume(IDENTIFIER, "Expect parameter name.")
+			if err != nil {
+				return nil, err
+			}
+
+			parameters = append(parameters, param)
+
+			if !p.match(COMMA) {
+				break
+			}
+		}
+	}
+
+	if _, err := p.consume(RIGHT_PAREN, "Expect ')' after parameters."); err != nil {
+		return nil, err
+	}
+	if _, err := p.consume(LEFT_BRACE, "Expect '{' before "+kind+" body."); err != nil {
+		return nil, err
+	}
+
+	body, err := p.block()
+	if err != nil {
+		return nil, err
+	}
+
+	return &FunctionStmt{
+		Name:   name,
+		Params: parameters,
+		Body:   body,
+	}, nil
 }
 
 func (p *Parser) varDeclaration() (Stmt, error) {
@@ -122,6 +173,10 @@ func (p *Parser) statement() (Stmt, error) {
 	}
 	if p.match(PRINT) {
 		return p.printStatement()
+	}
+
+	if p.match(RETURN) {
+		return p.returnStatement()
 	}
 
 	if p.match(WHILE) {
@@ -191,6 +246,28 @@ func (p *Parser) printStatement() (Stmt, error) {
 		Expression: expr,
 	}, nil
 
+}
+
+func (p *Parser) returnStatement() (Stmt, error) {
+	keyword := p.previous()
+	
+	var value Expr = nil
+	var err error
+	if !p.check(SEMICOLON) {
+		value, err = p.expression()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if _, err := p.consume(SEMICOLON, "Expect ';' after return value."); err != nil{
+		return nil, err
+	}
+
+	return &ReturnStmt{
+		Keyword: keyword,
+		Value: value,
+	}, nil
 }
 
 func (p *Parser) whileStatement() (Stmt, error) {
@@ -503,7 +580,59 @@ func (p *Parser) unary() (Expr, error) {
 		}, nil
 	}
 
-	return p.primary()
+	return p.call()
+}
+
+func (p *Parser) call() (Expr, error) {
+	var expr, err = p.primary()
+	if err != nil {
+		return nil, err
+	}
+
+	for {
+		if p.match(LEFT_PAREN) {
+			expr, err = p.finishCall(expr)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			break
+		}
+	}
+
+	return expr, nil
+}
+
+func (p *Parser) finishCall(callee Expr) (Expr, error) {
+	var arguments []Expr
+	if !p.check(RIGHT_PAREN) {
+		for {
+			if len(arguments) >= 255 {
+				p.Error(p.peek(), "Can't have more than 255 arguments.")
+			}
+
+			expr, err := p.expression()
+			if err != nil {
+				return nil, err
+			}
+			arguments = append(arguments, expr)
+
+			if !p.match(COMMA) {
+				break
+			}
+		}
+	}
+
+	paren, err := p.consume(RIGHT_PAREN, "Expect ')' after arguments.")
+	if err != nil {
+		return nil, err
+	}
+
+	return &CallExpr{
+		Callee:    callee,
+		Paren:     paren,
+		Arguments: arguments,
+	}, nil
 }
 
 func (p *Parser) primary() (Expr, error) {

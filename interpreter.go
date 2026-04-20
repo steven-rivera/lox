@@ -6,9 +6,13 @@ import (
 	"strconv"
 )
 
+var _ ExprVisitor = (*Interpreter)(nil)
+var _ StmtVisitor = (*Interpreter)(nil)
+
 type Interpreter struct {
 	Globals     *Environment
 	Environment *Environment
+	Locals      map[Expr]int
 }
 
 func NewInterpreter() *Interpreter {
@@ -18,6 +22,7 @@ func NewInterpreter() *Interpreter {
 	return &Interpreter{
 		Globals:     globals,
 		Environment: globals,
+		Locals: map[Expr]int{},
 	}
 }
 
@@ -143,19 +148,36 @@ func (i *Interpreter) VisitUnaryExpr(expr *UnaryExpr) any {
 }
 
 func (i *Interpreter) VisitVariableExpr(expr *VariableExpr) any {
-	return i.Environment.get(expr.Name)
+	return i.lookUpVariable(expr.Name, expr)
+}
+
+func (i *Interpreter) lookUpVariable(name Token, expr Expr) any {
+	if distance, ok := i.Locals[expr]; ok {
+		return i.Environment.getAt(distance, name.Lexeme)
+	}
+	return i.Globals.get(name)
 }
 
 func (i *Interpreter) VisitAssignExpr(expr *AssignExpr) any {
 	value := i.evaluate(expr.Value)
-	if err := i.Environment.assign(expr.Name, value); err != nil {
+	if err, ok := value.(error); ok {
 		return err
 	}
+
+	if distance, ok := i.Locals[expr]; ok {
+		i.Environment.assignAt(distance, expr.Name, value)
+	} else if err := i.Globals.assign(expr.Name, value); err != nil {
+		return err
+	}
+
 	return value
 }
 
 func (i *Interpreter) VisitCallExpr(expr *CallExpr) any {
 	callee := i.evaluate(expr.Callee)
+	if err, ok := callee.(error); ok {
+		return err
+	}
 
 	var arguments []any
 	for _, argument := range expr.Arguments {
@@ -264,6 +286,10 @@ func (i *Interpreter) evaluate(expr Expr) any {
 
 func (i *Interpreter) execute(stmt Stmt) any {
 	return stmt.Accept(i)
+}
+
+func (i *Interpreter) resolve(expr Expr, depth int) {
+	i.Locals[expr] = depth
 }
 
 func (i *Interpreter) executeBlock(statements []Stmt, environment *Environment) any {

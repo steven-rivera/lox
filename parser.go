@@ -250,7 +250,7 @@ func (p *Parser) printStatement() (Stmt, error) {
 
 func (p *Parser) returnStatement() (Stmt, error) {
 	keyword := p.previous()
-	
+
 	var value Expr = nil
 	var err error
 	if !p.check(SEMICOLON) {
@@ -260,13 +260,13 @@ func (p *Parser) returnStatement() (Stmt, error) {
 		}
 	}
 
-	if _, err := p.consume(SEMICOLON, "Expect ';' after return value."); err != nil{
+	if _, err := p.consume(SEMICOLON, "Expect ';' after return value."); err != nil {
 		return nil, err
 	}
 
 	return &ReturnStmt{
 		Keyword: keyword,
-		Value: value,
+		Value:   value,
 	}, nil
 }
 
@@ -691,7 +691,7 @@ func (p *Parser) consume(t TokenType, message string) (Token, error) {
 }
 
 func (p *Parser) Error(token Token, message string) error {
-	ParseError(token, message)
+	LoxError(token, message)
 	return fmt.Errorf("%s", message)
 }
 

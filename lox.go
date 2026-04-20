@@ -81,6 +81,14 @@ func (l *Lox) interpretStmts(source string) {
 		return
 	}
 
+	resolver := NewResolver(l.interpreter)
+	resolver.resolveStmts(statements)
+	if resolver.hadError {
+		l.hadError = true
+		return
+	}
+	
+
 	if err := l.interpreter.interpret(statements); err != nil {
 		runtimeError(err.(RuntimeError))
 		l.hadRuntimeError = true
@@ -145,7 +153,7 @@ func Report(line int, where, message string) {
 	fmt.Fprintf(os.Stderr, "[line %d] Error%s: %s\n", line, where, message)
 }
 
-func ParseError(token Token, message string) {
+func LoxError(token Token, message string) {
 	if token.Type == EOF {
 		Report(token.Line, " at end", message)
 	} else {

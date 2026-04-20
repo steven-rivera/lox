@@ -40,3 +40,20 @@ func (e *Environment) assign(name Token, value any) error {
 
 	return NewRunTimeError(name, "Undefined variable '"+name.Lexeme+"'.")
 }
+
+
+func (e *Environment) getAt(distance int, name string) any {
+	return e.ancestor(distance).Values[name]
+}
+
+func (e *Environment) assignAt(distance int, name Token, value any) {
+	e.ancestor(distance).Values[name.Lexeme] = value
+}
+
+func (e *Environment) ancestor(distance int) *Environment {
+	env := e
+	for range distance {
+		env = env.Enclosing
+	}
+	return env
+}

@@ -22,7 +22,7 @@ func NewInterpreter() *Interpreter {
 	return &Interpreter{
 		Globals:     globals,
 		Environment: globals,
-		Locals: map[Expr]int{},
+		Locals:      map[Expr]int{},
 	}
 }
 
@@ -120,6 +120,30 @@ func (i *Interpreter) VisitLogicalExpr(expr *LogicalExpr) any {
 	return right
 }
 
+func (i *Interpreter) VisitSetExpr(expr *SetExpr) any {
+	object := i.evaluate(expr.Object)
+	if err, ok := object.(error); ok {
+		return err
+	}
+
+	instance, ok := object.(*LoxInstance)
+	if !ok {
+		return NewRunTimeError(expr.Name, "Only instances have fields.")
+	}
+
+	value := i.evaluate(expr.Value)
+	if err, ok := value.(error); ok {
+		return err
+	}
+
+	instance.set(expr.Name, value)
+	return value
+}
+
+func (i *Interpreter) VisitThisExpr(expr *ThisExpr) any {
+	return i.lookUpVariable(expr.Keyword, expr)
+}
+
 func (i *Interpreter) VisitGroupingExpr(expr *GroupingExpr) any {
 	return i.evaluate(expr.Expression)
 }
@@ -201,6 +225,19 @@ func (i *Interpreter) VisitCallExpr(expr *CallExpr) any {
 	return function.Call(i, arguments)
 }
 
+func (i *Interpreter) VisitGetExpr(expr *GetExpr) any {
+	object := i.evaluate(expr.Object)
+	if err, ok := object.(error); ok {
+		return err
+	}
+
+	if object, ok := object.(*LoxInstance); ok {
+		return object.get(expr.Name)
+	}
+
+	return NewRunTimeError(expr.Name, "Only instances have properties.")
+}
+
 func (i *Interpreter) VisitExpressionStmt(stmt *ExprStmt) any {
 	return i.evaluate(stmt.Expression)
 }
@@ -271,13 +308,27 @@ func (i *Interpreter) VisitWhileStmt(stmt *WhileStmt) any {
 }
 
 func (i *Interpreter) VisitFunctionStmt(stmt *FunctionStmt) any {
-	function := NewLoxFuncntion(stmt, i.Environment)
+	function := NewLoxFunction(stmt, i.Environment, false)
 	i.Environment.define(stmt.Name.Lexeme, function)
 	return nil
 }
 
 func (i *Interpreter) VisitBlockStmt(stmt *BlockStmt) any {
 	return i.executeBlock(stmt.Statements, NewEnvironment(i.Environment))
+}
+
+func (i *Interpreter) VisitClassStmt(stmt *ClassStmt) any {
+	i.Environment.define(stmt.Name.Lexeme, nil)
+
+	methods := map[string]*LoxFunction{}
+	for _, method := range stmt.Methods {
+		function := NewLoxFunction(method, i.Environment, method.Name.Lexeme == "init")
+		methods[method.Name.Lexeme] = function
+	}
+
+	class := NewLoxClass(stmt.Name.Lexeme, methods)
+	i.Environment.assign(stmt.Name, class)
+	return nil
 }
 
 func (i *Interpreter) evaluate(expr Expr) any {
@@ -366,6 +417,8 @@ func (i *Interpreter) stringify(object any) string {
 	case float64:
 		return strconv.FormatFloat(object, 'f', -1, 64)
 	case LoxCallable:
+		return object.toString()
+	case *LoxInstance:
 		return object.toString()
 	default:
 		return fmt.Sprint(object)

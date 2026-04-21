@@ -1,27 +1,38 @@
 package main
 
 type FunctionType = int
+type ClassType = int
 
 const (
-	NONE FunctionType = iota
-	FUNCTION
+	FUN_TYPE_NONE FunctionType = iota
+	FUN_TYPE_FUNCTION
+	FUN_TYPE_INITIALIZER
+	FUN_TYPE_METHOD
+)
+
+const (
+	CLS_TYPE_NONE ClassType = iota
+	CLS_TYPE_CLASS
 )
 
 var _ ExprVisitor = (*Resolver)(nil)
 var _ StmtVisitor = (*Resolver)(nil)
+
 type Resolver struct {
 	Interpreter     *Interpreter
 	Scopes          Stack[map[string]bool]
 	currentFunction FunctionType
+	currentClass    ClassType
 	hadError        bool
 }
 
 func NewResolver(interpreter *Interpreter) *Resolver {
 	return &Resolver{
-		Interpreter: interpreter,
-		Scopes:      Stack[map[string]bool]{},
-		currentFunction: NONE,
-		hadError:    false,
+		Interpreter:     interpreter,
+		Scopes:          Stack[map[string]bool]{},
+		currentFunction: FUN_TYPE_NONE,
+		currentClass:    CLS_TYPE_NONE,
+		hadError:        false,
 	}
 }
 
@@ -29,6 +40,28 @@ func (r *Resolver) VisitBlockStmt(stmt *BlockStmt) any {
 	r.beginScope()
 	r.resolveStmts(stmt.Statements)
 	r.endScope()
+	return nil
+}
+
+func (r *Resolver) VisitClassStmt(stmt *ClassStmt) any {
+	enclosingClass := r.currentClass
+	r.currentClass = CLS_TYPE_CLASS
+
+	r.declare(stmt.Name)
+	r.define(stmt.Name)
+
+	r.beginScope()
+	r.Scopes.Peek()["this"] = true
+	for _, method := range stmt.Methods {
+		declaration := FUN_TYPE_METHOD
+		if method.Name.Lexeme == "init" {
+			declaration = FUN_TYPE_INITIALIZER
+		}
+		r.resolveFunction(method, declaration)
+	}
+	r.endScope()
+
+	r.currentClass = enclosingClass
 	return nil
 }
 
@@ -40,7 +73,7 @@ func (r *Resolver) VisitExpressionStmt(stmt *ExprStmt) any {
 func (r *Resolver) VisitFunctionStmt(stmt *FunctionStmt) any {
 	r.declare(stmt.Name)
 	r.define(stmt.Name)
-	r.resolveFunction(stmt, FUNCTION)
+	r.resolveFunction(stmt, FUN_TYPE_FUNCTION)
 	return nil
 }
 
@@ -59,12 +92,16 @@ func (r *Resolver) VisitPrintStmt(stmt *PrintStmt) any {
 }
 
 func (r *Resolver) VisitReturnStmt(stmt *ReturnStmt) any {
-	if r.currentFunction == NONE {
+	if r.currentFunction == FUN_TYPE_NONE {
 		LoxError(stmt.Keyword, "Can't return from top-level code.")
 		r.hadError = true
 	}
-	
+
 	if stmt.Value != nil {
+		if r.currentFunction == FUN_TYPE_INITIALIZER {
+			LoxError(stmt.Keyword, "Can't return a value from an initializer.")
+			r.hadError = true
+		}
 		r.resolveExpr(stmt.Value)
 	}
 	return nil
@@ -105,6 +142,11 @@ func (r *Resolver) VisitCallExpr(expr *CallExpr) any {
 	return nil
 }
 
+func (r *Resolver) VisitGetExpr(expr *GetExpr) any {
+	r.resolveExpr(expr.Object)
+	return nil
+}
+
 func (r *Resolver) VisitGroupingExpr(expr *GroupingExpr) any {
 	r.resolveExpr(expr.Expression)
 	return nil
@@ -117,6 +159,23 @@ func (r *Resolver) VisitLiteralExpr(expr *LiteralExpr) any {
 func (r *Resolver) VisitLogicalExpr(expr *LogicalExpr) any {
 	r.resolveExpr(expr.Left)
 	r.resolveExpr(expr.Right)
+	return nil
+}
+
+func (r *Resolver) VisitSetExpr(expr *SetExpr) any {
+	r.resolveExpr(expr.Value)
+	r.resolveExpr(expr.Object)
+	return nil
+}
+
+func (r *Resolver) VisitThisExpr(expr *ThisExpr) any {
+	if r.currentClass == CLS_TYPE_NONE {
+		LoxError(expr.Keyword, "Can't use 'this' outside of a class.")
+		r.hadError = true
+		return nil
+	}
+
+	r.resolveLocal(expr, expr.Keyword)
 	return nil
 }
 

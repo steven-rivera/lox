@@ -9,6 +9,7 @@ type StmtVisitor interface {
 	VisitWhileStmt(*WhileStmt) any
 	VisitFunctionStmt(*FunctionStmt) any
 	VisitReturnStmt(*ReturnStmt) any
+	VisitClassStmt(*ClassStmt) any
 }
 
 type Stmt interface {
@@ -79,10 +80,18 @@ func (f *FunctionStmt) Accept(v StmtVisitor) any {
 
 type ReturnStmt struct {
 	Keyword Token
-	Value Expr
+	Value   Expr
 }
 
 func (r *ReturnStmt) Accept(v StmtVisitor) any {
 	return v.VisitReturnStmt(r)
 }
 
+type ClassStmt struct {
+	Name    Token
+	Methods []*FunctionStmt
+}
+
+func (c *ClassStmt) Accept(v StmtVisitor) any {
+	return v.VisitClassStmt(c)
+}

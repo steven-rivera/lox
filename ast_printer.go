@@ -45,6 +45,17 @@ func (p *AstPrinter) VisitCallExpr(expr *CallExpr) any {
 	return p.parenthesize("func " + p.print(expr.Callee), expr.Arguments...)
 }
 
+func (p *AstPrinter) VisitGetExpr(expr *GetExpr) any {
+	return p.parenthesize("get ", expr.Object)
+}
+
+func (p *AstPrinter) VisitSetExpr(expr *SetExpr) any {
+	return p.parenthesize("set ", expr.Object, expr.Value)
+}
+
+func (p *AstPrinter) VisitThisExpr(expr *ThisExpr) any {
+	return "this"
+}
 func (p *AstPrinter) print(expr Expr) string {
 	return expr.Accept(p).(string)
 }

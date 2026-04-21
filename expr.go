@@ -9,6 +9,9 @@ type ExprVisitor interface {
 	VisitVariableExpr(*VariableExpr) any
 	VisitAssignExpr(*AssignExpr) any
 	VisitCallExpr(*CallExpr) any
+	VisitGetExpr(*GetExpr) any
+	VisitSetExpr(*SetExpr) any
+	VisitThisExpr(*ThisExpr) any
 }
 
 type Expr interface {
@@ -87,4 +90,29 @@ func (c *CallExpr) Accept(v ExprVisitor) any {
 	return v.VisitCallExpr(c)
 }
 
+type GetExpr struct {
+	Object Expr
+	Name Token
+}
 
+func (g *GetExpr) Accept(v ExprVisitor) any {
+	return v.VisitGetExpr(g)
+}
+
+type SetExpr struct {
+	Object Expr
+	Name Token
+	Value Expr
+}
+
+func (s *SetExpr) Accept(v ExprVisitor) any {
+	return v.VisitSetExpr(s)
+}
+
+type ThisExpr struct {
+	Keyword Token
+}
+
+func (t *ThisExpr) Accept(v ExprVisitor) any {
+	return v.VisitThisExpr(t)
+}

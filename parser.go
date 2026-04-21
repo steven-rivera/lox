@@ -77,7 +77,9 @@ func (p *Parser) declaration() (Stmt, error) {
 	var stmt Stmt
 	var err error
 
-	if p.match(FUN) {
+	if p.match(CLASS) {
+		stmt, err = p.classDeclaration()
+	} else if p.match(FUN) {
 		stmt, err = p.function("function")
 	} else if p.match(VAR) {
 		stmt, err = p.varDeclaration()
@@ -91,6 +93,35 @@ func (p *Parser) declaration() (Stmt, error) {
 	}
 
 	return stmt, nil
+}
+
+func (p *Parser) classDeclaration() (Stmt, error) {
+	name, err := p.consume(IDENTIFIER, "Expect class name.")
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := p.consume(LEFT_BRACE, "Expect '{' before class body."); err != nil {
+		return nil, err
+	}
+
+	var methods []*FunctionStmt
+	for !p.check(RIGHT_BRACE) && !p.isAtEnd() {
+		method, err := p.function("method")
+		if err != nil {
+			return nil, err
+		}
+		methods = append(methods, method.(*FunctionStmt))
+	}
+
+	if _, err := p.consume(RIGHT_BRACE, "Expect '}' after class body."); err != nil {
+		return nil, err
+	}
+
+	return &ClassStmt{
+		Name:    name,
+		Methods: methods,
+	}, nil
 }
 
 func (p *Parser) function(kind string) (Stmt, error) {
@@ -419,6 +450,12 @@ func (p *Parser) assignment() (Expr, error) {
 				Name:  varExpr.Name,
 				Value: value,
 			}, nil
+		} else if getExpr, ok := expr.(*GetExpr); ok {
+			return &SetExpr{
+				Object: getExpr.Object,
+				Name: getExpr.Name,
+				Value: value,
+			}, nil
 		}
 
 		p.Error(equals, "Invalid assignment target.")
@@ -595,6 +632,15 @@ func (p *Parser) call() (Expr, error) {
 			if err != nil {
 				return nil, err
 			}
+		} else if p.match(DOT) {
+			name, err := p.consume(IDENTIFIER, "Expect property name after '.'.")
+			if err != nil {
+				return nil, err
+			}
+			expr = &GetExpr{
+				Object: expr,
+				Name: name,
+			}
 		} else {
 			break
 		}
@@ -655,6 +701,12 @@ func (p *Parser) primary() (Expr, error) {
 	if p.match(NUMBER, STRING) {
 		return &LiteralExpr{
 			Value: p.previous().Literal,
+		}, nil
+	}
+
+	if p.match(THIS) {
+		return &ThisExpr{
+			Keyword: p.previous(),
 		}, nil
 	}
 

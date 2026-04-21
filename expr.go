@@ -12,6 +12,7 @@ type ExprVisitor interface {
 	VisitGetExpr(*GetExpr) any
 	VisitSetExpr(*SetExpr) any
 	VisitThisExpr(*ThisExpr) any
+	VisitSuperExpr(*SuperExpr) any
 }
 
 type Expr interface {
@@ -115,4 +116,13 @@ type ThisExpr struct {
 
 func (t *ThisExpr) Accept(v ExprVisitor) any {
 	return v.VisitThisExpr(t)
+}
+
+type SuperExpr struct {
+	Keyword Token
+	Method Token
+}
+
+func (s *SuperExpr) Accept(v ExprVisitor) any {
+	return v.VisitSuperExpr(s)
 }

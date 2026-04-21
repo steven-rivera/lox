@@ -56,6 +56,11 @@ func (p *AstPrinter) VisitSetExpr(expr *SetExpr) any {
 func (p *AstPrinter) VisitThisExpr(expr *ThisExpr) any {
 	return "this"
 }
+
+func (p *AstPrinter) VisitSuperExpr(expr *SuperExpr) any {
+	return "super " + expr.Method.Lexeme
+}
+
 func (p *AstPrinter) print(expr Expr) string {
 	return expr.Accept(p).(string)
 }

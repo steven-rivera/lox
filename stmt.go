@@ -88,8 +88,9 @@ func (r *ReturnStmt) Accept(v StmtVisitor) any {
 }
 
 type ClassStmt struct {
-	Name    Token
-	Methods []*FunctionStmt
+	Name       Token
+	SuperClass *VariableExpr
+	Methods    []*FunctionStmt
 }
 
 func (c *ClassStmt) Accept(v StmtVisitor) any {

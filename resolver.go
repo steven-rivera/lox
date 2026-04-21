@@ -13,6 +13,7 @@ const (
 const (
 	CLS_TYPE_NONE ClassType = iota
 	CLS_TYPE_CLASS
+	CLS_TYPE_SUBCLASS
 )
 
 var _ ExprVisitor = (*Resolver)(nil)
@@ -50,6 +51,17 @@ func (r *Resolver) VisitClassStmt(stmt *ClassStmt) any {
 	r.declare(stmt.Name)
 	r.define(stmt.Name)
 
+	if stmt.SuperClass != nil {
+		if stmt.Name.Lexeme == stmt.SuperClass.Name.Lexeme {
+			LoxError(stmt.SuperClass.Name, "A class can't inherit from itself.")
+			r.hadError = true
+		}
+		r.currentClass = CLS_TYPE_SUBCLASS
+		r.resolveExpr(stmt.SuperClass)
+		r.beginScope()
+		r.Scopes.Peek()["super"] = true
+	}
+
 	r.beginScope()
 	r.Scopes.Peek()["this"] = true
 	for _, method := range stmt.Methods {
@@ -60,6 +72,10 @@ func (r *Resolver) VisitClassStmt(stmt *ClassStmt) any {
 		r.resolveFunction(method, declaration)
 	}
 	r.endScope()
+
+	if stmt.SuperClass != nil {
+		r.endScope()
+	}
 
 	r.currentClass = enclosingClass
 	return nil
@@ -165,6 +181,19 @@ func (r *Resolver) VisitLogicalExpr(expr *LogicalExpr) any {
 func (r *Resolver) VisitSetExpr(expr *SetExpr) any {
 	r.resolveExpr(expr.Value)
 	r.resolveExpr(expr.Object)
+	return nil
+}
+
+func (r *Resolver) VisitSuperExpr(expr *SuperExpr) any {
+	if r.currentClass == CLS_TYPE_NONE {
+		LoxError(expr.Keyword, "Can't use 'super' outside of a class.")
+		r.hadError = true
+	} else if r.currentClass != CLS_TYPE_SUBCLASS {
+		LoxError(expr.Keyword, "Can't use 'super' in a class with no superclass.")
+		r.hadError = true
+	}
+
+	r.resolveLocal(expr, expr.Keyword)
 	return nil
 }
 
